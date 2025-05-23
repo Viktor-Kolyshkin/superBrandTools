@@ -1,4 +1,3 @@
-// == Load Plyr Library Once on Script Load ==
 window._plyrLoadingPromise = (function() {
     if (window.Plyr) {
         return Promise.resolve();
