@@ -1,3 +1,7 @@
+:root{
+    --plyr-color-main: #ff7755;
+}
+
 .video-v2{
     position: relative;
     background-color: #2b2b2b;

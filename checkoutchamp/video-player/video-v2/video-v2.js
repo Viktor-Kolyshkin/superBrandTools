@@ -33,10 +33,11 @@ window._plyrLoadingPromise = (function() {
 })();
 
 class video_v2 {
-    constructor({ videoId, revealDelay = 5 }) {
+    constructor({ desktopVideoId, mobileVideoId, revealDelay = 5 }) {
         this.containerClass = '.video-v2';
         this.revealClass = '.video-v2-hidden';
-        this.videoId = videoId;
+        this.desktopVideoId = desktopVideoId;
+        this.mobileVideoId = mobileVideoId;
         this.revealDelay = revealDelay;
 
         this.container = document.querySelector(this.containerClass);
@@ -45,14 +46,17 @@ class video_v2 {
             return;
         }
 
+        // Detect if device is mobile based on window width
         this.isMobile = window.innerWidth <= 576;
+
+        // Initialize internal state
         this.videoWatchInterval = null;
         this.videoWatchSeconds = 0;
         this.videoTriggered = false;
         this.player = null;
-        this.isActivated = false; // Flag to track if user pressed play button (video with sound)
+        this.isActivated = false; // Flag to indicate if video is played with sound
 
-        // Wait for Plyr lib to load before init
+        // Wait for Plyr library to load before initializing
         window._plyrLoadingPromise.then(() => {
             this.init();
         }).catch(err => {
@@ -60,8 +64,10 @@ class video_v2 {
         });
     }
 
+    // Return video URL based on device type
     getVideoURL() {
-        return `https://vz-c066735f-815.b-cdn.net/${this.videoId}/play_720p.mp4`;
+        const id = this.isMobile ? this.mobileVideoId : this.desktopVideoId;
+        return `https://vz-c066735f-815.b-cdn.net/${id}/play_720p.mp4`;
     }
 
     createVideo() {
@@ -74,6 +80,7 @@ class video_v2 {
         source.type = 'video/mp4';
         videoEl.appendChild(source);
 
+        // Get desktop and mobile containers
         const desktopContainer = this.container.querySelector('.video-v2-desktop');
         const mobileContainer = this.container.querySelector('.video-v2-mobile');
 
@@ -82,17 +89,19 @@ class video_v2 {
             return;
         }
 
+        // Clear existing video content
         desktopContainer.innerHTML = '';
         mobileContainer.innerHTML = '';
 
+        // Append video element to the right container based on device
         const targetContainer = this.isMobile ? mobileContainer : desktopContainer;
         targetContainer.appendChild(videoEl);
 
-        // Remove existing button if any
+        // Remove old play button if exists
         const oldBtn = this.container.querySelector('.video-v2-button');
         if (oldBtn) oldBtn.remove();
 
-        // Show button only if not activated yet
+        // Show play button if video is not activated yet
         if (!this.isActivated) {
             this.container.insertAdjacentHTML('beforeend', `
                 <div class="video-v2-button">
@@ -102,23 +111,27 @@ class video_v2 {
             `);
         }
 
-        // Destroy previous player if exists
+        // Destroy previous Plyr instance if any
         if (this.player) {
             this.player.destroy?.();
             this.player = null;
         }
 
+        // Initialize Plyr player
         this.player = new Plyr(videoEl, {
             controls: ['play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen'],
             autoplay: true,
-            muted: !this.isActivated,
+            muted: !this.isActivated, // mute video if not activated by user
             loop: { active: true },
         });
 
-        // Play muted video automatically in background
+        // Set initial volume to 50%
+        videoEl.volume = 0.5;
+
+        // Attempt to autoplay video muted
         videoEl.play().catch(() => {});
 
-        // Remove any old intervals on recreate
+        // Reset watch tracking variables
         clearInterval(this.videoWatchInterval);
         this.videoWatchInterval = null;
         this.videoWatchSeconds = 0;
@@ -132,25 +145,25 @@ class video_v2 {
             if (this.isMobile !== prevIsMobile) {
                 prevIsMobile = this.isMobile;
 
-                // Remove active class on container
+                // Remove active state when resizing switches device type
                 this.container.classList.remove('active');
 
-                // Reset video triggered flag
+                // Reset video watch tracking state
                 this.videoTriggered = false;
                 this.videoWatchSeconds = 0;
                 clearInterval(this.videoWatchInterval);
 
-                // Recreate video (will create muted, no controls video)
+                // Recreate video element for new device type
                 this.createVideo();
 
-                // Add play button back if not exists
+                // Add play button if it doesn't exist after recreate
                 if (!this.container.querySelector('.video-v2-button')) {
                     this.container.insertAdjacentHTML('beforeend', `
-                    <div class="video-v2-button">
-                        <div class="video-v2-button_icon"></div>
-                        <div class="video-v2-button_text"></div>
-                    </div>
-                `);
+                        <div class="video-v2-button">
+                            <div class="video-v2-button_icon"></div>
+                            <div class="video-v2-button_text"></div>
+                        </div>
+                    `);
                 }
 
                 // Set volume to 50%
@@ -159,16 +172,18 @@ class video_v2 {
                     : this.container.querySelector('.video-v2-desktop');
                 const video = parent.querySelector('video');
                 if (video) video.volume = 0;
+
             }
         });
     }
 
-
     setupPlayListener() {
+        // Listen for click on play button anywhere in body
         document.body.addEventListener('click', (e) => {
             const btn = e.target.closest('.video-v2-button');
             if (!btn || !this.container.contains(btn)) return;
 
+            // Select correct video container based on device type
             const parent = this.isMobile
                 ? this.container.querySelector('.video-v2-mobile')
                 : this.container.querySelector('.video-v2-desktop');
@@ -177,7 +192,7 @@ class video_v2 {
             const video = parent.querySelector('video');
             if (!video) return;
 
-            // Remove play button
+            // Remove play button on click
             btn.remove();
 
             this.isActivated = true;
@@ -185,16 +200,19 @@ class video_v2 {
             this.videoWatchSeconds = 0;
             clearInterval(this.videoWatchInterval);
 
+            // Enable controls, unmute and reset video time
             video.muted = false;
             video.controls = true;
             video.currentTime = 0;
 
+            // Play video with sound at full volume
             video.play();
             video.volume = 1.0;
 
-            // Add 'active' class on container when video plays with sound
+            // Add active class to container to mark playing with sound
             this.container.classList.add('active');
 
+            // Start interval to track watched seconds and reveal block after delay
             this.videoWatchInterval = setInterval(() => {
                 if (!video.paused && !video.ended) {
                     this.videoWatchSeconds++;
@@ -208,11 +226,13 @@ class video_v2 {
         });
     }
 
+    // Show hidden block after video watched enough seconds
     showRevealBlock() {
         const block = document.querySelector(this.revealClass);
         if (block) block.style.display = 'block';
     }
 
+    // Initialize the component
     init() {
         this.createVideo();
         this.setupResizeListener();
@@ -220,5 +240,5 @@ class video_v2 {
     }
 }
 
-// Expose globally
+// Expose class globally
 window.video_v2 = video_v2;
