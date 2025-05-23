@@ -61,7 +61,6 @@ class video_v2 {
         this.loadAssets([
             { type: 'css', url: 'https://cdn.plyr.io/3.7.8/plyr.css' },
             { type: 'js', url: 'https://cdn.plyr.io/3.7.8/plyr.js' },
-            { type: 'css', url: 'video-v2.css' }
         ]).then(() => {
             // After all assets loaded, init Plyr-related stuff and video
             if (!window.Plyr) {
