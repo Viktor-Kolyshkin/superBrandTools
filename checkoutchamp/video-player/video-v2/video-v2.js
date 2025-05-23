@@ -46,25 +46,80 @@ class video_v2 {
             return;
         }
 
-        // Detect if device is mobile based on window width
         this.isMobile = window.innerWidth <= 576;
 
-        // Initialize internal state
+        // Internal state
         this.videoWatchInterval = null;
         this.videoWatchSeconds = 0;
         this.videoTriggered = false;
         this.player = null;
-        this.isActivated = false; // Flag to indicate if video is played with sound
+        this.isActivated = false;
 
-        // Wait for Plyr library to load before initializing
-        window._plyrLoadingPromise.then(() => {
+        // Load all external assets first
+        this.loadAssets([
+            { type: 'css', url: 'https://cdn.plyr.io/3.7.8/plyr.css' },
+            { type: 'js', url: 'https://cdn.plyr.io/3.7.8/plyr.js' },
+            { type: 'css', url: 'video-v2.css' }
+        ]).then(() => {
+            // After all assets loaded, init Plyr-related stuff and video
+            if (!window.Plyr) {
+                console.error('Plyr did not load');
+                return;
+            }
             this.init();
         }).catch(err => {
-            console.error('Error loading Plyr:', err);
+            console.error('Error loading assets:', err);
         });
     }
 
-    // Return video URL based on device type
+    // Universal asset loader, returns a Promise
+    loadAssets(assets) {
+        const promises = assets.map(asset => {
+            if (asset.type === 'css') {
+                return this.loadCSS(asset.url);
+            } else if (asset.type === 'js') {
+                return this.loadJS(asset.url);
+            }
+            return Promise.reject(new Error('Unknown asset type: ' + asset.type));
+        });
+        return Promise.all(promises);
+    }
+
+    loadCSS(href) {
+        return new Promise((resolve, reject) => {
+            if (document.querySelector(`link[href="${href}"]`)) {
+                // Already loaded
+                resolve();
+                return;
+            }
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = href;
+            link.onload = () => resolve();
+            link.onerror = () => reject(new Error(`Failed to load CSS: ${href}`));
+            document.head.appendChild(link);
+        });
+    }
+
+    loadJS(src) {
+        return new Promise((resolve, reject) => {
+            if (document.querySelector(`script[src="${src}"]`)) {
+                // Script tag already present - wait until window.Plyr or relevant global is ready
+                // For generic case, resolve immediately — or you can enhance with polling if needed
+                resolve();
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error(`Failed to load JS: ${src}`));
+            document.body.appendChild(script);
+        });
+    }
+
+    ////////////////////////////////////////
+
     getVideoURL() {
         const id = this.isMobile ? this.mobileVideoId : this.desktopVideoId;
         return `https://vz-c066735f-815.b-cdn.net/${id}/play_720p.mp4`;
@@ -226,13 +281,11 @@ class video_v2 {
         });
     }
 
-    // Show hidden block after video watched enough seconds
     showRevealBlock() {
         const block = document.querySelector(this.revealClass);
         if (block) block.style.display = 'block';
     }
 
-    // Initialize the component
     init() {
         this.createVideo();
         this.setupResizeListener();
